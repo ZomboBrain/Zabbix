@@ -1,5 +1,5 @@
 # Script: Get-VBRJob
-# Author: Jean-Jacques Martr�s (jjmartres |at| gmail |dot| com)
+# Author: Jean-Jacques Martrès (jjmartres |at| gmail |dot| com)
 # Description: Query Veeam job information
 # License: GPL2
 #
@@ -18,7 +18,7 @@
 # Add to Zabbix Agent
 #   UserParameter=vbr[*],%SystemRoot%\system32\WindowsPowerShell\v1.0\powershell.exe -nologo -command "& C:\Zabbix\zabbix_vbr_job.ps1 $1 $2"
 #
-$version = "1.0.4"
+$version = "1.0.5"
 
 $ITEM = [string]$args[0]
 $ID = [string]$args[1]
@@ -26,12 +26,35 @@ $ID = [string]$args[1]
 #* Load Veeam snapin
 Add-PsSnapin -Name VeeamPSSnapIn -ErrorAction SilentlyContinue
 
-# Query VEEAM for Job. Include only enabled jobs
+# Query VEEAM for Job. Include only enabled Disk-Jobs. 
+# No enabled-check for Tape-Jobs yet. 
+
 switch ($ITEM) {
   "Discovery" {
     # Open JSON object
     $output =  "{`"data`":["
       $query = Get-VBRJob | Where-Object {$_.IsScheduleEnabled -eq "true"} | Select-Object Id,Name, IsScheduleEnabled
+      $count = $query | Measure-Object
+      $count = $count.count
+      foreach ($object in $query) {
+        $Id = [string]$object.Id
+        $Name = [string]$object.Name
+        $Schedule = [string]$object.IsScheduleEnabled
+        if ($count -eq 1) {
+          $output = $output + "{`"{#JOBID}`":`"$Id`",`"{#JOBNAME}`":`"$Name`",`"{#JOBSCHEDULED}`":`"$Schedule`"}"
+        } else {
+          $output = $output + "{`"{#JOBID}`":`"$Id`",`"{#JOBNAME}`":`"$Name`",`"{#JOBSCHEDULED}`":`"$Schedule`"},"
+        }
+        $count--
+    }
+    # Close JSON object
+    $output = $output + "]}"
+    Write-Host $output
+  }
+  "Discovery-Tape" {
+    # Open JSON object
+    $output =  "{`"data`":["
+      $query = Get-VBRTapeJob | Select-Object Id,Name, IsScheduleEnabled
       $count = $query | Measure-Object
       $count = $count.count
       foreach ($object in $query) {
@@ -65,6 +88,20 @@ switch ($ITEM) {
     }
   }
     else {"2"}
+  }
+  "Result-Tape"  {
+  $query = Get-VBRTapeJob | Where-Object {$_.Id -like "*$ID*"} | select LastResult
+    switch ([string]$query) {
+      "Failed" {
+        return "0"
+      }
+      "Warning" {
+        return "1"
+      }
+      default {
+        return "2"
+      }
+    }
   }
   "RunStatus" {
   $query = Get-VBRJob | Where-Object {$_.Id -like "*$ID*"}
