@@ -26,8 +26,7 @@ $ID = [string]$args[1]
 #* Load Veeam snapin
 Add-PsSnapin -Name VeeamPSSnapIn -ErrorAction SilentlyContinue
 
-# Query VEEAM for Job. Include only enabled Disk-Jobs. 
-# No enabled-check for Tape-Jobs yet. 
+# Query VEEAM for Job. Include only enabled Disk-Jobs. No enabled-check for Tape-Jobs yet. 
 
 switch ($ITEM) {
   "Discovery" {
